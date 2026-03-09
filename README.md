@@ -1,87 +1,38 @@
 # Nova-AI
 Voice-powered AI assistant that listens to your questions, searches answers online, and speaks them in real time.
-import speech_recognition as sr
-import pyttsx3
-from serpapi import GoogleSearch
+## Inspiration
+The idea for NOVA AI came from the need for a fast, reliable, and voice-powered AI assistant that can provide instant answers to user queries. During the Gemini Live Agent Challenge, I realized the potential of combining voice input, real-time search, and AI-powered response in a single seamless experience.
 
-API_KEY = "bfb29c7e9e242ff3a8faa6cbcc985358f52f5cac30267bf0a986b511934af4c5"
+## What it does
+NOVA AI listens to user questions through a microphone, searches for relevant answers using Google via SerpAPI, and provides clear spoken responses in real time. It acts as a lightweight, interactive AI assistant capable of handling live queries efficiently.
 
-# Voice Engine Setup
-voice_engine = pyttsx3.init()
-voice_engine.setProperty("rate", 160)
-voice_engine.setProperty("volume", 1.0)
-voices = voice_engine.getProperty("voices")
-voice_engine.setProperty("voice", voices[0].id)
+## How we built it
+The project was built using:
+Python for the main application logic
+Speech Recognition for capturing microphone input
+pyttsx3 for text-to-speech voice output
+SerpAPI for real-time Google search results
+Modular, loop-based workflow to ensure continuous listening and response
 
-def speak(message):
-    print("NOVA:", message)
-    voice_engine.say(message)
-    voice_engine.runAndWait()  # wait until speech finishes
-    voice_engine.stop()        # clear queue for next speech
+## Challenges we ran into
+Ensuring smooth voice output for consecutive answers without interruptions
+Handling ambient noise during microphone input
+Extracting accurate answers from Google search results when a direct answer box was not available
 
-# Speech Recognition
-recognizer = sr.Recognizer()
+## Accomplishments that we're proud of
+Successfully implemented a real-time voice assistant capable of handling multiple consecutive queries
+Integrated live search and speech synthesis for seamless user interaction
+Built a shareable, professional AI project in a short hackathon timeframe
 
-def listen():
-    with sr.Microphone() as source:
-        print("Listening...")
-        recognizer.adjust_for_ambient_noise(source)
-        audio_data = recognizer.listen(source)
+## What we learned
+How to combine voice recognition, AI search, and TTS in a single Python application
+Techniques to manage concurrency and queues in pyttsx3 for uninterrupted voice output
+Best practices for handling live user input and search results in a reliable and efficient way
 
-        try:
-            query = recognizer.recognize_google(audio_data)
-            print("You said:", query)
-            return query
-        except:
-            speak("Sorry, I didn't catch that.")
-            return ""
+## What's next for Nova AI
+Adding a GUI interface for a more interactive experience
+Integrating multilingual support, including Bangla and English
+Enhancing the system with Gemini-powered reasoning for richer answers
+Implementing activation words like “Hey Nova” for a hands-free experience
 
-# Google Search using SerpAPI
-def search_google(query):
-    params = {
-        "engine": "google",
-        "q": query,
-        "api_key": API_KEY
-    }
 
-    search = GoogleSearch(params)
-    results = search.get_dict()
-
-    answer = ""
-
-    if "answer_box" in results:
-        box = results["answer_box"]
-        if "answer" in box:
-            answer = box["answer"]
-        elif "snippet" in box:
-            answer = box["snippet"]
-
-    if answer == "" and "organic_results" in results:
-        answer = results["organic_results"][0]["snippet"]
-
-    if answer == "":
-        answer = "No clear answer found."
-
-    return answer
-
-# NOVA AI workflow
-def run_assistant():
-    while True:
-        user_question = listen()
-
-        if user_question == "":
-            continue
-
-        print("\nNOVA AI")
-        print("Searching...\n")
-
-        result = search_google(user_question)
-
-        print("Result:\n", result)
-        speak(result)
-
-        print("Done\n")
-
-# Start Assistant
-if __name__ == "__main__":
-    run_assistant()
