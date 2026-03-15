@@ -1,85 +1,101 @@
 import speech_recognition as sr
 import pyttsx3
+import webbrowser
+import datetime
+import os
+from google import genai
+from google.genai import types
 from serpapi import GoogleSearch
 
-API_KEY = "bfb29c7e9e242ff3a8faa6cbcc985358f52f5cac30267bf0a986b511934af4c5"
+GEMINI_API_KEY = "My_GEMINI_API_KEY_HERE" 
+SERP_API_KEY = "My_SERP_API_KEY" 
 
-# Voice Engine Setup
-voice_engine = pyttsx3.init()
-voice_engine.setProperty("rate", 160)
-voice_engine.setProperty("volume", 1.0)
-voices = voice_engine.getProperty("voices")
-voice_engine.setProperty("voice", voices[0].id)
+client = genai.Client(api_key=GEMINI_API_KEY)
 
-def speak(message):
-    print("NOVA:", message)
-    voice_engine.say(message)
-    voice_engine.runAndWait()  # wait until speech finishes
-    voice_engine.stop()        # clear queue for next speech
+class NovaAgent:
+    def __init__(self):
+        self.engine = pyttsx3.init()
+        self.engine.setProperty('rate', 185)
+        self.memory = []
 
-# Speech Recognition
-recognizer = sr.Recognizer()
+    def speak(self, text):
+        print(f"NOVA >> {text}")
+        self.engine.say(text)
+        self.engine.runAndWait()
 
-def listen():
-    with sr.Microphone() as source:
-        print("Listening...")
-        recognizer.adjust_for_ambient_noise(source)
-        audio_data = recognizer.listen(source)
-
+    def listen(self):
+        recognizer = sr.Recognizer()
+        with sr.Microphone() as source:
+            print("\n[NOVA is Listening...]")
+            recognizer.adjust_for_ambient_noise(source, duration=0.5)
+            audio = recognizer.listen(source)
         try:
-            query = recognizer.recognize_google(audio_data)
-            print("You said:", query)
-            return query
+            query = recognizer.recognize_google(audio)
+            print(f"USER >> {query}")
+            return query.lower()
         except:
-            speak("Sorry, I didn't catch that.")
             return ""
 
-# Google Search using SerpAPI
-def search_google(query):
-    params = {
-        "engine": "google",
-        "q": query,
-        "api_key": API_KEY
-    }
+    def analyze_vision(self, img_path):
+        try:
+            with open(img_path, "rb") as f:
+                image_data = f.read()
+            response = client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=["Describe this image in detail for a blind person.", 
+                          types.Part.from_bytes(data=image_data, mime_type="image/jpeg")]
+            )
+            return response.text
+        except Exception as e:
+            return f"Vision Error: {str(e)}"
 
-    search = GoogleSearch(params)
-    results = search.get_dict()
+    def get_web_data(self, query):
+        params = {"engine": "google", "q": query, "api_key": SERP_API_KEY}
+        try:
+            search = GoogleSearch(params)
+            res = search.get_dict()
+            return res.get("answer_box", {}).get("snippet") or res["organic_results"][0]["snippet"]
+        except:
+            return None
 
-    answer = ""
+    def brain_processing(self, user_input):
+        try:
+            context = "\n".join(self.memory[-4:])
+            full_prompt = f"System: You are Nova, a helpful AI Agent.\nContext:\n{context}\nUser: {user_input}"
+            response = client.models.generate_content(model="gemini-2.0-flash", contents=full_prompt)
+            self.memory.append(f"User: {user_input}")
+            self.memory.append(f"Nova: {response.text}")
+            return response.text
+        except:
+            return None
 
-    if "answer_box" in results:
-        box = results["answer_box"]
-        if "answer" in box:
-            answer = box["answer"]
-        elif "snippet" in box:
-            answer = box["snippet"]
+    def start_agent(self):
+        self.speak("Nova Advanced System Initiated. All modules are online.")
+        while True:
+            query = self.listen()
+            if not query: continue
+            if any(word in query for word in ["stop", "exit", "offline"]):
+                self.speak("Terminating sessions. System offline. Goodbye.")
+                break
+            elif "open youtube" in query:
+                self.speak("Opening YouTube interface.")
+                webbrowser.open("https://youtube.com")
+            elif "analyze image" in query or "see this" in query:
+                self.speak("Please ensure 'test.jpg' is in the project folder. Scanning...")
+                if os.path.exists("test.jpg"):
+                    description = self.analyze_vision("test.jpg")
+                    self.speak(description)
+                else:
+                    self.speak("Image file not found.")
+            else:
+                answer = self.brain_processing(query)
+                if answer:
+                    self.speak(answer)
+                else:
+                    self.speak("Accessing real-time web databases...")
+                    web_res = self.get_web_data(query)
+                    self.speak(web_res if web_res else "Data retrieval failed.")
 
-    if answer == "" and "organic_results" in results:
-        answer = results["organic_results"][0]["snippet"]
-
-    if answer == "":
-        answer = "No clear answer found."
-
-    return answer
-
-# NOVA AI workflow
-def run_assistant():
-    while True:
-        user_question = listen()
-
-        if user_question == "":
-            continue
-
-        print("\nNOVA AI")
-        print("Searching...\n")
-
-        result = search_google(user_question)
-
-        print("Result:\n", result)
-        speak(result)
-
-        print("Done\n")
-
-# Start Assistant
 if __name__ == "__main__":
-    run_assistant()
+    nova = NovaAgent()
+    nova.start_agent()
